@@ -23,8 +23,11 @@ type Job struct {
 	ID        string    `json:"id"`
 	Type      JobType   `json:"type"`
 	Status    JobStatus `json:"status"`
-	Payload   any       `json:"payload"` // payload can be any data structure first, depending on job type
+	Payload   any       `json:"payload"`          // payload can be any data structure first, depending on job type
+	Result    any       `json:"result,omitempty"` // result can be any data structure first, depending on job type
+	Error     string    `json:"error,omitempty"`
 	Retries   int       `json:"retries"`
 	MaxRetry  int       `json:"max_retry"`
 	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
