@@ -59,11 +59,19 @@ func (q *MemoryQueue) GetJob(id string) (*model.Job, bool) {
 }
 
 // update job fields without race conditions
-func (q *MemoryQueue) UpdateJob(id string, fn func(*model.Job)) {
+// return COPY of job
+func (q *MemoryQueue) UpdateJob(id string, fn func(*model.Job)) (*model.Job, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
-	if job, ok := q.store[id]; ok {
-		fn(job)
+	job, ok := q.store[id]
+
+	if !ok {
+		return nil, false // job not found
 	}
+
+	fn(job)      // mutate the real store copy under the lock
+	copy := *job // shallow copy for the caller
+
+	return &copy, true
 }
