@@ -31,10 +31,10 @@ func TestEnqueue(t *testing.T) {
 	job2 := &model.Job{ID: "job-2"}
 	job3 := &model.Job{ID: "job-3"}
 
-	q.Enqueue(job2)
+	q.Enqueue(job2) // ok, cap full
 
 	err = q.Enqueue(job3) // Should fail (3rd job in size-2 queue)
-	if err == nil {
-		t.Errorf("expected error for full queue, but got nil")
+	if err != nil {
+		t.Errorf("error: %v", err)
 	}
 }

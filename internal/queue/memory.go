@@ -57,3 +57,13 @@ func (q *MemoryQueue) GetJob(id string) (*model.Job, bool) {
 	job, ok := q.store[id]
 	return job, ok
 }
+
+// update job fields without race conditions
+func (q *MemoryQueue) UpdateJob(id string, fn func(*model.Job)) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	if job, ok := q.store[id]; ok {
+		fn(job)
+	}
+}
