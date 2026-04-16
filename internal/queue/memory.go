@@ -55,7 +55,12 @@ func (q *MemoryQueue) GetJob(id string) (*model.Job, bool) {
 	defer q.mu.RUnlock()
 
 	job, ok := q.store[id]
-	return job, ok
+	if !ok {
+		return nil, false // job not found
+	}
+
+	copy := *job // shallow copy for caller
+	return &copy, ok
 }
 
 // update job fields without race conditions
@@ -74,4 +79,9 @@ func (q *MemoryQueue) UpdateJob(id string, fn func(*model.Job)) (*model.Job, boo
 	copy := *job // shallow copy for the caller
 
 	return &copy, true
+}
+
+func (q *MemoryQueue) Close() {
+	// Close channel to signal workers to stop
+	close(q.jobs)
 }
