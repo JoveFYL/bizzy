@@ -19,6 +19,7 @@ type MemoryQueue struct {
 	store map[string]*model.Job
 }
 
+// NewMemoryQueue initializes the in-memory queue with a specified buffer size
 func NewMemoryQueue(size int) *MemoryQueue {
 	return &MemoryQueue{
 		jobs:  make(chan *model.Job, size),

@@ -23,6 +23,7 @@ type Pool struct {
 	quit chan struct{}
 }
 
+// NewPool initializes the worker pool with the given number of workers and job channel
 func NewPool(workers int, queue *queue.MemoryQueue, jobs <-chan *model.Job, requeue func(*model.Job) error) *Pool {
 	return &Pool{
 		workers:  workers,
