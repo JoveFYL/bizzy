@@ -34,7 +34,7 @@ func TestEnqueue(t *testing.T) {
 	q.Enqueue(job2) // ok, cap full
 
 	err = q.Enqueue(job3) // Should fail (3rd job in size-2 queue)
-	if err != nil {
+	if err == nil {
 		t.Errorf("error: %v", err)
 	}
 }

@@ -38,7 +38,7 @@ func (q *MemoryQueue) Enqueue(job *model.Job) error {
 	case q.jobs <- job:
 		return nil
 
-	// if buffer is full, block
+	// if buffer is full, return immediately with error instead of blocking
 	default:
 		return fmt.Errorf("Queue is full (capacity: %d)", cap(q.jobs))
 	}
