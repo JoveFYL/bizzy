@@ -22,6 +22,9 @@ func NewRouter(q *queue.MemoryQueue) *gin.Engine {
 	r.GET("/jobs", func(g *gin.Context) {
 		getAllJobs(g, q)
 	})
+	r.GET("/job/:id", func(g *gin.Context) {
+		getJob(g, q)
+	})
 	return r
 }
 
@@ -63,3 +66,17 @@ func getAllJobs(c *gin.Context, q *queue.MemoryQueue) {
 }
 
 // get job by ID
+func getJob(c *gin.Context, q *queue.MemoryQueue) {
+	id := c.Param("id")
+	job, ok := q.GetJob(id)
+
+	if !ok {
+		c.JSON(404, gin.H{"message": "job not found"})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "success",
+		"job":     job,
+	})
+}
