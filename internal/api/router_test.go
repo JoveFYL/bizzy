@@ -38,11 +38,11 @@ func TestSubmitJob(t *testing.T) {
 
 	var res map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &res)
-	returnedID := res["job_id"].(string)
-
 	if err != nil {
-		t.Errorf("failed to parse json response: %v", err)
+		t.Fatalf("failed to parse json response: %v", err)
 	}
+
+	returnedID := res["job_id"].(string)
 
 	savedJob, found := q.GetJob(returnedID)
 
@@ -86,7 +86,7 @@ func TestGetAllJobs(t *testing.T) {
 
 	err := json.Unmarshal(w.Body.Bytes(), &res)
 	if err != nil {
-		t.Errorf("failed to parse json response: %v", err)
+		t.Fatalf("failed to parse json response: %v", err)
 	}
 
 	if res["message"] != "success" {
@@ -101,6 +101,59 @@ func TestGetAllJobs(t *testing.T) {
 
 	if len(jobs) != 3 {
 		t.Errorf("expected 3 jobs, got %d", len(jobs))
+	}
+
+}
+
+func TestGetJob(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	router, _ := CreateRouterHelper(t)
+
+	// create fake browser tab/connection
+	submitRecorder := httptest.NewRecorder()
+	payload := `{"type":"image_processing","payload":{"data":"hello"}}`
+	submitReq, _ := http.NewRequest("POST", "/submit", strings.NewReader(payload))
+	submitReq.Header.Set("Content-Type", "application/json")
+
+	router.ServeHTTP(submitRecorder, submitReq)
+
+	if submitRecorder.Code != http.StatusAccepted {
+		t.Errorf("expected status code %d, got %d", http.StatusAccepted, submitRecorder.Code)
+	}
+
+	var submitRes map[string]any
+	submitErr := json.Unmarshal(submitRecorder.Body.Bytes(), &submitRes)
+
+	if submitErr != nil {
+		t.Fatalf("failed to parse json response: %v", submitErr)
+	}
+
+	submittedID := submitRes["job_id"].(string)
+
+	getRecorder := httptest.NewRecorder()
+	getReq, _ := http.NewRequest("GET", "/job/"+submittedID, nil)
+	router.ServeHTTP(getRecorder, getReq)
+
+	var getRes map[string]any
+	getErr := json.Unmarshal(getRecorder.Body.Bytes(), &getRes)
+
+	if getErr != nil {
+		t.Fatalf("failed to parse json response: %v", getErr)
+	}
+
+	returnedID := getRes["job_id"].(string)
+
+	if getRecorder.Code != http.StatusOK {
+		t.Errorf("The API returned ID '%s', but that job does not exist inside the queue storage!", submittedID)
+	}
+
+	if returnedID != submittedID {
+		t.Errorf("Storage ID '%s' does not match API returned ID '%s'", returnedID, submittedID)
+	}
+
+	if getRes["message"] != "success" {
+		t.Errorf("expected message 'success', got %s", getRes["message"])
 	}
 
 }

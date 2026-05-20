@@ -77,6 +77,7 @@ func getJob(c *gin.Context, q *queue.MemoryQueue) {
 
 	c.JSON(200, gin.H{
 		"message": "success",
+		"job_id":  id,
 		"job":     job,
 	})
 }
