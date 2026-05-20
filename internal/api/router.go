@@ -54,7 +54,7 @@ func submitJob(c *gin.Context, q *queue.MemoryQueue) {
 		return
 	}
 
-	c.JSON(202, gin.H{"message": "job submitted successfully"})
+	c.JSON(202, gin.H{"message": "job submitted successfully", "job_id": job.ID})
 }
 
 func getAllJobs(c *gin.Context, q *queue.MemoryQueue) {
