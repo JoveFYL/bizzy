@@ -19,6 +19,9 @@ func NewRouter(q *queue.MemoryQueue) *gin.Engine {
 	r.POST("/submit", func(g *gin.Context) {
 		submitJob(g, q)
 	})
+	r.GET("/jobs", func(g *gin.Context) {
+		getAllJobs(g, q)
+	})
 	return r
 }
 
@@ -49,6 +52,14 @@ func submitJob(c *gin.Context, q *queue.MemoryQueue) {
 	}
 
 	c.JSON(202, gin.H{"message": "job submitted successfully"})
+}
+
+func getAllJobs(c *gin.Context, q *queue.MemoryQueue) {
+	jobs := q.GetAllJobs()
+	c.JSON(200, gin.H{
+		"message": "success",
+		"jobs":    jobs,
+	})
 }
 
 // get job by ID

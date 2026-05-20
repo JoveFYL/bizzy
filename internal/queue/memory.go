@@ -64,6 +64,18 @@ func (q *MemoryQueue) GetJob(id string) (*model.Job, bool) {
 	return &copy, ok
 }
 
+func (q *MemoryQueue) GetAllJobs() []*model.Job {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+
+	jobs := make([]*model.Job, 0, len(q.store))
+	for _, j := range q.store {
+		copy := *j
+		jobs = append(jobs, &copy)
+	}
+	return jobs
+}
+
 // update job fields without race conditions
 // return COPY of job
 func (q *MemoryQueue) UpdateJob(id string, fn func(*model.Job)) (*model.Job, bool) {
