@@ -59,3 +59,48 @@ func TestSubmitJob(t *testing.T) {
 	}
 
 }
+
+func TestGetAllJobs(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	router, _ := CreateRouterHelper(t)
+
+	// submit 3 jobs
+	for range 3 {
+		recorder := httptest.NewRecorder()
+		payload := `{"type":"image_processing","payload":{"data":"hello"}}`
+		req, _ := http.NewRequest("POST", "/submit", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(recorder, req)
+	}
+
+	req, _ := http.NewRequest("GET", "/jobs", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected status code %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var res map[string]any
+
+	err := json.Unmarshal(w.Body.Bytes(), &res)
+	if err != nil {
+		t.Errorf("failed to parse json response: %v", err)
+	}
+
+	if res["message"] != "success" {
+		t.Errorf("expected message 'job submitted successfully', got %s", res["message"])
+	}
+
+	jobs, ok := res["jobs"].([]any)
+
+	if !ok {
+		t.Errorf("expected 'jobs' to be an array, got %T", res["jobs"])
+	}
+
+	if len(jobs) != 3 {
+		t.Errorf("expected 3 jobs, got %d", len(jobs))
+	}
+
+}
