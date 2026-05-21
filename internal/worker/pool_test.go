@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/JoveFYL/bizzy/internal/model"
 	"github.com/JoveFYL/bizzy/internal/queue"
@@ -52,6 +53,36 @@ func TestWorkerPool_Success(t *testing.T) {
 	updatedJob, _ := q.GetJob("123")
 	if updatedJob.Status != model.StatusCompleted {
 		t.Errorf("expected completed status, got %s", updatedJob.Status)
+	}
+}
+
+func TestWorkerPool_GracefulShutdown(t *testing.T) {
+	pool, q := CreatePoolAndQueueHelper(t, 2)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	started := make(chan struct{})
+	pool.RegisterHandler("slow_job", func(job *model.Job) (any, error) {
+		close(started)
+		time.Sleep(50 * time.Millisecond)
+		return "done", nil
+	})
+
+	pool.Start(ctx)
+	q.Enqueue(&model.Job{ID: "slow", Type: "slow_job"})
+
+	<-started
+	cancel()
+
+	done := make(chan struct{})
+	go func() {
+		pool.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("pool did not drain within timeout")
 	}
 }
 
