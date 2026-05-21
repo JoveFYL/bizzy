@@ -11,7 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func CreateRouterHelper(t *testing.T) (*gin.Engine, *queue.MemoryQueue) {
+func CreateRouterHelper(t *testing.T) (*gin.Engine, queue.Queue) {
 	// skips printing this function in test logs
 	t.Helper()
 	q := queue.NewMemoryQueue(100)

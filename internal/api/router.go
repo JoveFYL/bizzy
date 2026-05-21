@@ -14,7 +14,7 @@ type JobRequest struct {
 	Payload       any `json:"payload" binding:"required"`
 }
 
-func NewRouter(q *queue.MemoryQueue) *gin.Engine {
+func NewRouter(q queue.Queue) *gin.Engine {
 	r := gin.Default()
 	r.POST("/submit", func(g *gin.Context) {
 		submitJob(g, q)
@@ -29,7 +29,7 @@ func NewRouter(q *queue.MemoryQueue) *gin.Engine {
 }
 
 // submit job
-func submitJob(c *gin.Context, q *queue.MemoryQueue) {
+func submitJob(c *gin.Context, q queue.Queue) {
 	var req JobRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -57,7 +57,7 @@ func submitJob(c *gin.Context, q *queue.MemoryQueue) {
 	c.JSON(202, gin.H{"message": "job submitted successfully", "job_id": job.ID})
 }
 
-func getAllJobs(c *gin.Context, q *queue.MemoryQueue) {
+func getAllJobs(c *gin.Context, q queue.Queue) {
 	jobs := q.GetAllJobs()
 	c.JSON(200, gin.H{
 		"message": "success",
@@ -66,7 +66,7 @@ func getAllJobs(c *gin.Context, q *queue.MemoryQueue) {
 }
 
 // get job by ID
-func getJob(c *gin.Context, q *queue.MemoryQueue) {
+func getJob(c *gin.Context, q queue.Queue) {
 	id := c.Param("id")
 	job, ok := q.GetJob(id)
 
