@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	"errors"
 	"sync/atomic"
 	"testing"
@@ -26,6 +27,8 @@ func CreatePoolAndQueueHelper(t *testing.T, workers int) (*Pool, *queue.MemoryQu
 
 func TestWorkerPool_Success(t *testing.T) {
 	pool, q := CreatePoolAndQueueHelper(t, 2)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // stops workers when test exits
 
 	doneSignal := make(chan struct{})
 
@@ -35,7 +38,7 @@ func TestWorkerPool_Success(t *testing.T) {
 	})
 
 	// launch goroutines in background
-	pool.Start()
+	pool.Start(ctx)
 
 	job := &model.Job{
 		ID:   "123",
@@ -55,6 +58,8 @@ func TestWorkerPool_Success(t *testing.T) {
 func TestWorkerPool_RetryLogic(t *testing.T) {
 	q := queue.NewMemoryQueue(10)
 	pool := NewPool(1, q, q.Dequeue(), q.Enqueue)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel() // stops workers when test exits
 
 	doneSignal := make(chan struct{})
 	var attempts atomic.Int32
@@ -66,7 +71,7 @@ func TestWorkerPool_RetryLogic(t *testing.T) {
 		return nil, errors.New("temporary error")
 	})
 
-	pool.Start()
+	pool.Start(ctx)
 
 	job := &model.Job{
 		ID:       "retry_test",

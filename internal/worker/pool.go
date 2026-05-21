@@ -1,9 +1,11 @@
 package worker
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/JoveFYL/bizzy/internal/model"
@@ -12,50 +14,62 @@ import (
 
 type HandlerFunc func(*model.Job) (any, error)
 
-// pull job from queue and work on executing the job
 type Pool struct {
 	workers  int
 	jobs     <-chan *model.Job
-	queue    *queue.MemoryQueue
+	queue    queue.Queue
 	handlers map[model.JobType]HandlerFunc
 	requeue  func(*model.Job) error
-	// channel to signal all workers to stop
-	quit chan struct{}
+	wg       sync.WaitGroup
 }
 
-// NewPool initializes the worker pool with the given number of workers and job channel
-func NewPool(workers int, queue *queue.MemoryQueue, jobs <-chan *model.Job, requeue func(*model.Job) error) *Pool {
+func NewPool(workers int, q queue.Queue, jobs <-chan *model.Job, requeue func(*model.Job) error) *Pool {
 	return &Pool{
 		workers:  workers,
 		jobs:     jobs,
-		queue:    queue,
+		queue:    q,
 		handlers: make(map[model.JobType]HandlerFunc),
 		requeue:  requeue,
-		quit:     make(chan struct{}),
 	}
 }
 
-// RegisterHandler allows us to add logic for different job types
 func (p *Pool) RegisterHandler(jobType model.JobType, handler HandlerFunc) {
 	p.handlers[jobType] = handler
 }
 
-// Start launches the goroutines
-func (p *Pool) Start() {
+// launch worker goroutines
+// Call Wait() to block until all workers have drained and finished.
+func (p *Pool) Start(ctx context.Context) {
 	for i := 0; i < p.workers; i++ {
-		go p.RunWorker(i)
+		p.wg.Add(1)
+		go func(id int) {
+			defer p.wg.Done()
+			p.runWorker(ctx, id)
+		}(i)
 	}
 	slog.Info("worker pool started", "count", p.workers)
 }
 
-func (p *Pool) RunWorker(id int) {
+// Wait blocks until all workers have stopped processing.
+func (p *Pool) Wait() {
+	p.wg.Wait()
+}
+
+func (p *Pool) runWorker(ctx context.Context, id int) {
 	slog.Info("worker started", "worker_id", id)
-
-	for job := range p.jobs {
-		p.ProcessJob(id, job)
+	for {
+		select {
+		case <-ctx.Done():
+			slog.Info("worker stopping (context cancelled)", "worker_id", id)
+			return
+		case job, ok := <-p.jobs:
+			if !ok {
+				slog.Info("worker stopped (channel closed)", "worker_id", id)
+				return
+			}
+			p.ProcessJob(id, job)
+		}
 	}
-
-	slog.Info("worker stopped", "worker_id", id)
 }
 
 func (p *Pool) ProcessJob(workerID int, job *model.Job) {
@@ -73,8 +87,6 @@ func (p *Pool) ProcessJob(workerID int, job *model.Job) {
 		return
 	}
 
-	// mark job in-progress
-	// get store copy
 	current, ok := p.queue.UpdateJob(job.ID, func(job *model.Job) {
 		job.Status = model.StatusProcessing
 		job.UpdatedAt = time.Now()
@@ -84,10 +96,8 @@ func (p *Pool) ProcessJob(workerID int, job *model.Job) {
 		return
 	}
 
-	// run handler on store copy
 	result, err := handler(current)
 
-	// if error, retry
 	if err != nil {
 		logger.Info("job failed", "error", err, "retries", job.Retries, "max_retry", job.MaxRetry)
 
@@ -97,7 +107,6 @@ func (p *Pool) ProcessJob(workerID int, job *model.Job) {
 		p.queue.UpdateJob(job.ID, func(j *model.Job) {
 			j.Error = err.Error()
 			j.UpdatedAt = time.Now()
-
 			if j.Retries < j.MaxRetry {
 				j.Retries++
 				j.Status = model.StatusPending
@@ -111,17 +120,13 @@ func (p *Pool) ProcessJob(workerID int, job *model.Job) {
 		if shouldRetry {
 			backoff := time.Duration(math.Exp2(float64(retryCount))) * time.Second
 			logger.Info("scheduling retry", "attempt", retryCount, "backoff", backoff)
-
 			time.AfterFunc(backoff, func() {
-				// Get a fresh copy from the store to enqueue.
 				copy, ok := p.queue.GetJob(job.ID)
 				if !ok {
 					return
 				}
-
 				if err := p.requeue(copy); err != nil {
 					logger.Error("failed to requeue", "error", err)
-
 					p.queue.UpdateJob(job.ID, func(j *model.Job) {
 						j.Status = model.StatusFailed
 						j.Error = fmt.Sprintf("requeue failed: %v", err)
